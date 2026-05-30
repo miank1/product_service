@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"ecommerce-backend/services/productservice/internal/service"
+	"ecommerce-backend/services/product_service/internal/service"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,8 +13,7 @@ type ProductHandler struct {
 
 // ReduceStockRequest defines the request structure
 type ReduceStockRequest struct {
-	ProductID string `json:"product_id" binding:"required"`
-	Quantity  int    `json:"quantity" binding:"required"`
+	Quantity int `json:"quantity" binding:"required"`
 }
 
 func NewProductHandler(s *service.ProductService) *ProductHandler {
@@ -113,20 +112,26 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 }
 
 func (h *ProductHandler) ReduceStock(c *gin.Context) {
+	productID := c.Param("id")
+	if productID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing product id"})
+		return
+	}
+
 	var req ReduceStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.Svc.ReduceStock(req.ProductID, req.Quantity); err != nil {
+	if err := h.Svc.ReduceStock(productID, req.Quantity); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Stock reduced successfully",
-		"product_id":    req.ProductID,
+		"product_id":    productID,
 		"quantity_sold": req.Quantity,
 	})
 }

@@ -1,18 +1,25 @@
 package service
 
 import (
-	model "ecommerce-backend/services/productservice/internal/models"
-	repository "ecommerce-backend/services/productservice/internal/reposotory"
+	model "ecommerce-backend/services/product_service/internal/models"
 	"errors"
 	"fmt"
 	"time"
 )
 
-type ProductService struct {
-	Repo *repository.ProductRepository
+type ProductRepository interface {
+	Create(*model.Product) error
+	GetAll() ([]model.Product, error)
+	GetByID(string) (*model.Product, error)
+	Update(*model.Product) error
+	Delete(string) error
 }
 
-func NewProductService(repo *repository.ProductRepository) *ProductService {
+type ProductService struct {
+	Repo ProductRepository
+}
+
+func NewProductService(repo ProductRepository) *ProductService {
 	return &ProductService{Repo: repo}
 }
 
@@ -81,6 +88,10 @@ func (s *ProductService) DeleteProduct(id string) error {
 }
 
 func (s *ProductService) ReduceStock(productID string, qty int) error {
+	if qty <= 0 {
+		return fmt.Errorf("quantity must be greater than 0")
+	}
+
 	product, err := s.Repo.GetByID(productID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch product: %w", err)
