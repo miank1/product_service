@@ -1,8 +1,9 @@
 package handler
 
 import (
-	"ecommerce-backend/services/product_service/internal/service"
+	"errors"
 	"net/http"
+	"product-service/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,10 +29,10 @@ type createProductReq struct {
 }
 
 type updateProductReq struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Stock       int     `json:"stock"`
+	Name        *string  `json:"name"`
+	Description *string  `json:"description"`
+	Price       *float64 `json:"price"`
+	Stock       *int     `json:"stock"`
 }
 
 func (h *ProductHandler) Create(c *gin.Context) {
@@ -71,11 +72,11 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 
 	product, err := h.Svc.GetProductByID(id)
 	if err != nil {
+		if errors.Is(err, service.ErrProductNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "product not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "failed to fetch product"})
-		return
-	}
-	if product == nil {
-		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "product not found"})
 		return
 	}
 
@@ -93,6 +94,10 @@ func (h *ProductHandler) Update(c *gin.Context) {
 
 	product, err := h.Svc.UpdateProduct(id, req.Name, req.Description, req.Price, req.Stock)
 	if err != nil {
+		if errors.Is(err, service.ErrProductNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "product not found"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
@@ -104,6 +109,10 @@ func (h *ProductHandler) Update(c *gin.Context) {
 func (h *ProductHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.Svc.DeleteProduct(id); err != nil {
+		if errors.Is(err, service.ErrProductNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "product not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
@@ -125,6 +134,10 @@ func (h *ProductHandler) ReduceStock(c *gin.Context) {
 	}
 
 	if err := h.Svc.ReduceStock(productID, req.Quantity); err != nil {
+		if errors.Is(err, service.ErrProductNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

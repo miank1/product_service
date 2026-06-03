@@ -2,19 +2,19 @@ package service
 
 import (
 	"errors"
+	model "product-service/internal/models"
 	"testing"
-
-	model "ecommerce-backend/services/product_service/internal/models"
 
 	"github.com/google/uuid"
 )
 
 type stubProductRepo struct {
-	createFn func(*model.Product) error
-	getAllFn func() ([]model.Product, error)
-	getByIDFn func(string) (*model.Product, error)
-	updateFn func(*model.Product) error
-	deleteFn func(string) error
+	createFn      func(*model.Product) error
+	getAllFn      func() ([]model.Product, error)
+	getByIDFn     func(string) (*model.Product, error)
+	updateFn      func(*model.Product) error
+	deleteFn      func(string) error
+	reduceStockFn func(string, int) error
 }
 
 func (s *stubProductRepo) Create(p *model.Product) error {
@@ -48,6 +48,13 @@ func (s *stubProductRepo) Update(p *model.Product) error {
 func (s *stubProductRepo) Delete(id string) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
+	}
+	return nil
+}
+
+func (s *stubProductRepo) ReduceStock(id string, qty int) error {
+	if s.reduceStockFn != nil {
+		return s.reduceStockFn(id, qty)
 	}
 	return nil
 }
@@ -117,44 +124,27 @@ func TestReduceStockRejectsNonPositiveQuantity(t *testing.T) {
 }
 
 func TestReduceStockRejectsInsufficientStock(t *testing.T) {
-	product := &model.Product{
-		ID:    uuid.New(),
-		Name:  "Keyboard",
-		Price: 99.99,
-		Stock: 2,
-	}
-
 	repo := &stubProductRepo{
-		getByIDFn: func(id string) (*model.Product, error) {
-			return product, nil
+		reduceStockFn: func(id string, qty int) error {
+			return errors.New("insufficient stock")
 		},
 	}
 
 	svc := NewProductService(repo)
 
-	err := svc.ReduceStock(product.ID.String(), 3)
+	err := svc.ReduceStock(uuid.NewString(), 3)
 	if err == nil {
 		t.Fatalf("expected insufficient stock error")
 	}
 }
 
 func TestReduceStockUpdatesStockWhenQuantityIsValid(t *testing.T) {
-	product := &model.Product{
-		ID:    uuid.New(),
-		Name:  "Mouse",
-		Price: 49.99,
-		Stock: 10,
-	}
-
 	updated := false
 	repo := &stubProductRepo{
-		getByIDFn: func(id string) (*model.Product, error) {
-			return product, nil
-		},
-		updateFn: func(p *model.Product) error {
+		reduceStockFn: func(id string, qty int) error {
 			updated = true
-			if p.Stock != 7 {
-				t.Fatalf("expected stock to be reduced to 7, got %d", p.Stock)
+			if qty != 3 {
+				t.Fatalf("expected quantity 3, got %d", qty)
 			}
 			return nil
 		},
@@ -162,18 +152,18 @@ func TestReduceStockUpdatesStockWhenQuantityIsValid(t *testing.T) {
 
 	svc := NewProductService(repo)
 
-	if err := svc.ReduceStock(product.ID.String(), 3); err != nil {
+	if err := svc.ReduceStock(uuid.NewString(), 3); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if !updated {
-		t.Fatalf("expected repository update to be called")
+		t.Fatalf("expected repository ReduceStock to be called")
 	}
 }
 
-func TestReduceStockReturnsWrappedFetchError(t *testing.T) {
+func TestReduceStockReturnsRepoError(t *testing.T) {
 	repo := &stubProductRepo{
-		getByIDFn: func(id string) (*model.Product, error) {
-			return nil, errors.New("db unavailable")
+		reduceStockFn: func(id string, qty int) error {
+			return errors.New("db unavailable")
 		},
 	}
 

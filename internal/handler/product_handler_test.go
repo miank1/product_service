@@ -5,25 +5,31 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	model "product-service/internal/models"
+	"product-service/internal/service"
 	"testing"
-
-	model "ecommerce-backend/services/product_service/internal/models"
-	"ecommerce-backend/services/product_service/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type handlerStubRepo struct {
-	getByIDFn func(string) (*model.Product, error)
-	updateFn  func(*model.Product) error
+	getByIDFn     func(string) (*model.Product, error)
+	updateFn      func(*model.Product) error
+	reduceStockFn func(string, int) error
 }
 
-func (s *handlerStubRepo) Create(*model.Product) error                  { return nil }
-func (s *handlerStubRepo) GetAll() ([]model.Product, error)             { return nil, nil }
-func (s *handlerStubRepo) Delete(string) error                          { return nil }
-func (s *handlerStubRepo) GetByID(id string) (*model.Product, error)    { return s.getByIDFn(id) }
-func (s *handlerStubRepo) Update(p *model.Product) error                { return s.updateFn(p) }
+func (s *handlerStubRepo) Create(*model.Product) error               { return nil }
+func (s *handlerStubRepo) GetAll() ([]model.Product, error)          { return nil, nil }
+func (s *handlerStubRepo) Delete(string) error                       { return nil }
+func (s *handlerStubRepo) GetByID(id string) (*model.Product, error) { return s.getByIDFn(id) }
+func (s *handlerStubRepo) Update(p *model.Product) error             { return s.updateFn(p) }
+func (s *handlerStubRepo) ReduceStock(id string, qty int) error {
+	if s.reduceStockFn != nil {
+		return s.reduceStockFn(id, qty)
+	}
+	return nil
+}
 
 func TestReduceStockUsesPathParamAndQuantityBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)

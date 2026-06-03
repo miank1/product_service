@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	model "product-service/internal/models"
 
 	"gorm.io/gorm"
@@ -39,7 +40,34 @@ func (r *ProductRepository) Update(p *model.Product) error {
 	return r.DB.Save(p).Error
 }
 
+func (r *ProductRepository) ReduceStock(id string, qty int) error {
+	res := r.DB.Model(&model.Product{}).
+		Where("id = ? AND stock >= ?", id, qty).
+		UpdateColumn("stock", gorm.Expr("stock - ?", qty))
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		var count int64
+		if err := r.DB.Model(&model.Product{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return errors.New("insufficient stock")
+	}
+	return nil
+}
+
 // Delete product
 func (r *ProductRepository) Delete(id string) error {
-	return r.DB.Delete(&model.Product{}, "id = ?", id).Error
+	res := r.DB.Delete(&model.Product{}, "id = ?", id)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

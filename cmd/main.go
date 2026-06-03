@@ -1,17 +1,17 @@
 package main
 
 import (
-	"ecommerce-backend/pkg/config"
-	"ecommerce-backend/pkg/db"
-	"ecommerce-backend/pkg/logger"
-	"ecommerce-backend/services/product_service/internal/handler"
-	model "ecommerce-backend/services/product_service/internal/models"
-	repository "ecommerce-backend/services/product_service/internal/reposotory"
-	"ecommerce-backend/services/product_service/internal/service"
-	"ecommerce-backend/services/product_service/seed"
 	"fmt"
 	"log"
 	"os"
+	"product-service/internal/handler"
+	model "product-service/internal/models"
+	"product-service/internal/repository"
+	"product-service/internal/service"
+	"product-service/pkg/config"
+	"product-service/pkg/db"
+	"product-service/pkg/logger"
+	"product-service/seed"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -23,11 +23,9 @@ func main() {
 	defer logger.Sync()
 
 	// Load environment variables from .env file
-	if err := godotenv.Load("../.env"); err != nil {
-		log.Println("⚠️  No .env file found, using system environment variables")
+	if err := godotenv.Load(".env"); err != nil {
+		log.Println("⚠️ No .env file found")
 	}
-
-	log.Println("Loaded DSN:", os.Getenv("DATABASE_DSN"))
 
 	dsn := os.Getenv("DATABASE_DSN")
 
@@ -38,19 +36,30 @@ func main() {
 
 	if err = gormDB.AutoMigrate(&model.Product{}); err != nil {
 		log.Fatalf("auto migrate failed: %v", err)
+	} else {
+		log.Println("✅ Product table migration successful!")
 	}
 
 	var count int64
-
-	gormDB.Model(&repository.ProductRepository{}).Count(&count)
+	if err := gormDB.Model(&model.Product{}).Count(&count).Error; err != nil {
+		log.Fatalf("failed to count existing products: %v", err)
+	}
 
 	if count == 0 {
 		log.Println("Seeding products for the first time ... ")
-		seed.SeedProducts(gormDB)
+		if err := seed.SeedProducts(gormDB); err != nil {
+			log.Fatalf("failed to seed products: %v", err)
+		}
 		log.Println("Products seeded successfully ")
 	} else {
 		log.Println("Products alreadys existed, skipping seed.")
 	}
+
+	// Repository Pattern
+
+	productRepo := repository.NewProductRepository(gormDB)
+	productSvc := service.NewProductService(productRepo)
+	productHandler := handler.NewProductHandler(productSvc)
 
 	// Set up HTTP server
 	r := gin.Default()
@@ -60,21 +69,18 @@ func main() {
 		c.JSON(200, gin.H{"status": "productservice up"})
 	})
 
-	// Repository Pattern
+	api := r.Group("/products")
 
-	productRepo := repository.NewProductRepository(gormDB)
-	productSvc := service.NewProductService(productRepo)
-	productHandler := handler.NewProductHandler(productSvc)
-
-	api := r.Group("/api/v1")
-	api.POST("/products", productHandler.Create)
-	api.GET("/products", productHandler.List)
-	api.GET("/products/:id", productHandler.GetByID)
-	api.PUT("/products/:id", productHandler.Update)
-	api.DELETE("/products/:id", productHandler.Delete)
-	api.PATCH("/products/:id/reduce-stock", productHandler.ReduceStock)
+	api.POST("/create", productHandler.Create)
+	api.GET("/list", productHandler.List)
+	api.GET("/:id", productHandler.GetByID)
+	api.PUT("/:id", productHandler.Update)
+	api.DELETE("/:id", productHandler.Delete)
+	api.PATCH("/:id/reduce-stock", productHandler.ReduceStock)
 
 	port := config.GetEnv("PORT", "8082")
 	fmt.Println("✅ ProductService running on port", port)
-	r.Run(":" + port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("failed to start product service: %v", err)
+	}
 }

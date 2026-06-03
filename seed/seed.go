@@ -3,41 +3,39 @@ package seed
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"os"
+	"path/filepath"
+	model "product-service/internal/models"
+	"runtime"
 	"time"
 
-	"os"
-
-	uuid "github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-type Product struct {
-	ID       uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Name     string    `json:"name"`
-	Category string    `json:"category"`
-	Price    float64   `json:"price"`
-	Stock    int       `json:"stock"`
-}
-
 // SeedProducts loads products.json and inserts into DB
-func SeedProducts(db *gorm.DB) {
+func SeedProducts(db *gorm.DB) error {
 	start := time.Now()
 
-	data, err := os.ReadFile("../seed/products.json")
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("resolve seed file path: runtime caller unavailable")
+	}
+
+	seedFile := filepath.Join(filepath.Dir(currentFile), "products.json")
+
+	data, err := os.ReadFile(seedFile)
 	if err != nil {
-		log.Fatalf("❌ Failed to read products.json: %v", err)
+		return fmt.Errorf("read products.json: %w", err)
 	}
 
-	var products []Product
+	var products []model.Product
 	if err := json.Unmarshal(data, &products); err != nil {
-		log.Fatalf("❌ Failed to parse products.json: %v", err)
+		return fmt.Errorf("parse products.json: %w", err)
 	}
 
-	// ✅ Fetch all existing product names in one query
 	var existingNames []string
-	if err := db.Model(&Product{}).Select("name").Find(&existingNames).Error; err != nil {
-		log.Fatalf("❌ Failed to fetch existing product names: %v", err)
+	if err := db.Model(&model.Product{}).Select("name").Find(&existingNames).Error; err != nil {
+		return fmt.Errorf("fetch existing product names: %w", err)
 	}
 
 	existingSet := make(map[string]bool, len(existingNames))
@@ -45,21 +43,21 @@ func SeedProducts(db *gorm.DB) {
 		existingSet[name] = true
 	}
 
-	// ✅ Collect only new products
-	var newProducts []Product
+	var newProducts []model.Product
 	for _, p := range products {
 		if !existingSet[p.Name] {
 			newProducts = append(newProducts, p)
 		}
 	}
 
-	// ✅ Batch insert all new records at once
 	if len(newProducts) > 0 {
 		if err := db.CreateInBatches(newProducts, 100).Error; err != nil {
-			log.Fatalf("❌ Failed to batch insert products: %v", err)
+			return fmt.Errorf("batch insert products: %w", err)
 		}
 		fmt.Printf("✅ Inserted %d new products (%.2fs)\n", len(newProducts), time.Since(start).Seconds())
 	} else {
 		fmt.Println("ℹ️ All products already exist — nothing to insert.")
 	}
+
+	return nil
 }

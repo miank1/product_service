@@ -1,11 +1,14 @@
 package service
 
 import (
-	model "ecommerce-backend/services/product_service/internal/models"
 	"errors"
 	"fmt"
-	"time"
+	model "product-service/internal/models"
+
+	"gorm.io/gorm"
 )
+
+var ErrProductNotFound = errors.New("product not found")
 
 type ProductRepository interface {
 	Create(*model.Product) error
@@ -13,6 +16,7 @@ type ProductRepository interface {
 	GetByID(string) (*model.Product, error)
 	Update(*model.Product) error
 	Delete(string) error
+	ReduceStock(string, int) error
 }
 
 type ProductService struct {
@@ -33,8 +37,6 @@ func (s *ProductService) CreateProduct(name, desc string, price float64, stock i
 		Description: desc,
 		Price:       price,
 		Stock:       stock,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	if err := s.Repo.Create(product); err != nil {
@@ -50,30 +52,52 @@ func (s *ProductService) GetAllProducts() ([]model.Product, error) {
 
 // GetProductByID returns a single product by ID
 func (s *ProductService) GetProductByID(id string) (*model.Product, error) {
-	return s.Repo.GetByID(id)
-}
-
-// Update an existing product
-func (s *ProductService) UpdateProduct(id, name, desc string, price float64, stock int) (*model.Product, error) {
 	product, err := s.Repo.GetByID(id)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrProductNotFound
+		}
 		return nil, err
 	}
 	if product == nil {
-		return nil, errors.New("product not found")
+		return nil, ErrProductNotFound
+	}
+	return product, nil
+}
+
+// Update an existing product
+func (s *ProductService) UpdateProduct(id string, name, desc *string, price *float64, stock *int) (*model.Product, error) {
+	product, err := s.Repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrProductNotFound
+		}
+		return nil, err
+	}
+	if product == nil {
+		return nil, ErrProductNotFound
 	}
 
-	if name != "" {
-		product.Name = name
+	if name != nil {
+		if *name == "" {
+			return nil, errors.New("name cannot be empty")
+		}
+		product.Name = *name
 	}
-	if desc != "" {
-		product.Description = desc
+	if desc != nil {
+		product.Description = *desc
 	}
-	if price > 0 {
-		product.Price = price
+	if price != nil {
+		if *price <= 0 {
+			return nil, errors.New("price must be greater than zero")
+		}
+		product.Price = *price
 	}
-	if stock >= 0 {
-		product.Stock = stock
+	if stock != nil {
+		if *stock < 0 {
+			return nil, errors.New("stock cannot be negative")
+		}
+		product.Stock = *stock
 	}
 
 	if err := s.Repo.Update(product); err != nil {
@@ -92,22 +116,11 @@ func (s *ProductService) ReduceStock(productID string, qty int) error {
 		return fmt.Errorf("quantity must be greater than 0")
 	}
 
-	product, err := s.Repo.GetByID(productID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch product: %w", err)
-	}
-	if product == nil {
-		return fmt.Errorf("product not found")
-	}
-
-	if product.Stock < qty {
-		return fmt.Errorf("insufficient stock: available %d, requested %d", product.Stock, qty)
-	}
-
-	product.Stock -= qty
-
-	if err := s.Repo.Update(product); err != nil {
-		return fmt.Errorf("failed to update stock: %w", err)
+	if err := s.Repo.ReduceStock(productID, qty); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrProductNotFound
+		}
+		return err
 	}
 
 	return nil
