@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	model "product-service/internal/models"
-	"product-service/internal/service"
+	model "product_service/internal/models"
+	"product_service/internal/service"
 	"testing"
 
 	"github.com/gin-gonic/gin"

@@ -3,7 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
-	"product-service/internal/service"
+	"product_service/internal/service"
 
 	"github.com/gin-gonic/gin"
 )

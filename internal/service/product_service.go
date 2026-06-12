@@ -3,7 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
-	model "product-service/internal/models"
+	model "product_service/internal/models"
 
 	"gorm.io/gorm"
 )

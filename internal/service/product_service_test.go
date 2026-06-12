@@ -2,7 +2,7 @@ package service
 
 import (
 	"errors"
-	model "product-service/internal/models"
+	model "product_service/internal/models"
 	"testing"
 
 	"github.com/google/uuid"

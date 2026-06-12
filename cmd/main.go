@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"product-service/internal/handler"
-	model "product-service/internal/models"
-	"product-service/internal/repository"
-	"product-service/internal/service"
-	"product-service/pkg/config"
-	"product-service/pkg/db"
-	"product-service/pkg/logger"
-	"product-service/seed"
+	"product_service/internal/handler"
+	model "product_service/internal/models"
+	"product_service/internal/repository"
+	"product_service/internal/service"
+	"product_service/seed"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/miank1/ecommerce_backend/pkg/config"
+	"github.com/miank1/ecommerce_backend/pkg/db"
+	"github.com/miank1/ecommerce_backend/pkg/logger"
 )
 
 func main() {

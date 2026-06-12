@@ -2,7 +2,7 @@ package repository
 
 import (
 	"errors"
-	model "product-service/internal/models"
+	model "product_service/internal/models"
 
 	"gorm.io/gorm"
 )
