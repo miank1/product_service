@@ -17,15 +17,18 @@ import (
 	"github.com/miank1/ecommerce_backend/pkg/logger"
 )
 
+func LoadEnv() {
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load("../.env")
+}
+
 func main() {
 	// Get database configuration from environment
 	logger.Init()
 	defer logger.Sync()
 
 	// Load environment variables from .env file
-	if err := godotenv.Load(".env"); err != nil {
-		log.Println("⚠️ No .env file found")
-	}
+	LoadEnv()
 
 	dsn := os.Getenv("DATABASE_DSN")
 
