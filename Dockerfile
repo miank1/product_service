@@ -1,26 +1,32 @@
-# Stage 1: build
-FROM golang:1.24.6-alpine AS builder
+# ---------- Builder ----------
+FROM golang:1.25.3-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev
 
 WORKDIR /app
 
-# Copy go.mod and go.sum from repo root
+# Copy dependency files
 COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
-# Copy all source code
+# Copy source
 COPY . .
 
-# Build the binary for productservice
-WORKDIR /app/services/productservice
-RUN CGO_ENABLED=0 GOOS=linux go build -o /productservice ./cmd/main.go
+# Build binary
+RUN CGO_ENABLED=0 GOOS=linux go build -o product-service ./cmd/main.go
 
-# Stage 2: runtime
+
+# ---------- Runtime ----------
 FROM alpine:3.18
+
 RUN apk add --no-cache ca-certificates
 
-COPY --from=builder /productservice /usr/local/bin/productservice
+WORKDIR /app
+
+COPY --from=builder /app/product-service .
 
 EXPOSE 8082
-CMD ["/usr/local/bin/productservice"]
+
+CMD ["./product-service"]
